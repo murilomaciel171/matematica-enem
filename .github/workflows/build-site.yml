@@ -15,16 +15,23 @@ jobs:
         with:
           node-version: 22
 
-      - name: Achar a pasta do projeto
+      - name: Descompactar o projeto
         run: |
-          PKG=$(find . -name package.json -not -path "*/node_modules/*" -not -path "./.git/*" | head -1)
-          if [ -z "$PKG" ]; then
-            echo "ERRO: não encontrei nenhum package.json no repositório. Os arquivos do projeto não foram enviados."
+          if [ ! -f projeto-pronto-hospedagem.zip ]; then
+            echo "ERRO: envie o arquivo projeto-pronto-hospedagem.zip para o repositório."
             ls -la
             exit 1
           fi
+          mkdir projeto
+          unzip -q projeto-pronto-hospedagem.zip -d projeto
+          PKG=$(find projeto -name package.json -not -path "*/node_modules/*" | head -1)
+          if [ -z "$PKG" ]; then
+            echo "ERRO: não há package.json dentro do zip."
+            ls -R projeto | head -50
+            exit 1
+          fi
           DIR=$(dirname "$PKG")
-          echo "Projeto encontrado em: $DIR"
+          echo "Projeto em: $DIR"
           echo "APP_DIR=$DIR" >> "$GITHUB_ENV"
           ls -la "$DIR"
 
