@@ -1,0 +1,47 @@
+name: Gerar site pronto para hospedagem
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Localizar o index.html e montar o site-pronto
+        run: |
+          echo "Arquivos gerados:"
+          find . -name index.html -not -path "./node_modules/*" -not -path "./.git/*" || true
+          DIR=""
+          for d in .output/public dist/client dist; do
+            if [ -f "$d/index.html" ]; then DIR="$d"; break; fi
+          done
+          if [ -z "$DIR" ]; then
+            echo "ERRO: nenhum index.html foi gerado. Veja a lista acima."
+            ls -R .output dist 2>/dev/null | head -100
+            exit 1
+          fi
+          mkdir site-pronto
+          cp -r "$DIR"/. site-pronto/
+          cp public/.htaccess site-pronto/.htaccess
+          echo "Conteúdo final:"
+          ls -la site-pronto
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-pronto
+          path: site-pronto
+          include-hidden-files: true
