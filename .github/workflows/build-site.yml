@@ -15,33 +15,58 @@ jobs:
         with:
           node-version: 22
 
+      - name: Achar a pasta do projeto
+        run: |
+          PKG=$(find . -name package.json -not -path "*/node_modules/*" -not -path "./.git/*" | head -1)
+          if [ -z "$PKG" ]; then
+            echo "ERRO: não encontrei nenhum package.json no repositório. Os arquivos do projeto não foram enviados."
+            ls -la
+            exit 1
+          fi
+          DIR=$(dirname "$PKG")
+          echo "Projeto encontrado em: $DIR"
+          echo "APP_DIR=$DIR" >> "$GITHUB_ENV"
+          ls -la "$DIR"
+
       - name: Instalar dependências
+        working-directory: ${{ env.APP_DIR }}
         run: npm install --no-audit --no-fund
 
       - name: Compilar
+        working-directory: ${{ env.APP_DIR }}
         run: npm run build
 
-      - name: Localizar o index.html e montar o site-pronto
+      - name: Montar o site-pronto
+        working-directory: ${{ env.APP_DIR }}
         run: |
-          echo "Arquivos gerados:"
-          find . -name index.html -not -path "./node_modules/*" -not -path "./.git/*" || true
+          echo "index.html encontrados:"
+          find . -name index.html -not -path "./node_modules/*" || true
           DIR=""
           for d in .output/public dist/client dist; do
             if [ -f "$d/index.html" ]; then DIR="$d"; break; fi
           done
           if [ -z "$DIR" ]; then
-            echo "ERRO: nenhum index.html foi gerado. Veja a lista acima."
+            echo "ERRO: nenhum index.html foi gerado."
             ls -R .output dist 2>/dev/null | head -100
             exit 1
           fi
           mkdir site-pronto
           cp -r "$DIR"/. site-pronto/
-          cp public/.htaccess site-pronto/.htaccess
-          echo "Conteúdo final:"
+          cat > site-pronto/.htaccess <<'HTA'
+          <IfModule mod_rewrite.c>
+            RewriteEngine On
+            RewriteBase /
+            RewriteRule ^index\.html$ - [L]
+            RewriteCond %{REQUEST_FILENAME} !-f
+            RewriteCond %{REQUEST_FILENAME} !-d
+            RewriteRule . /index.html [L]
+          </IfModule>
+          DirectoryIndex index.html
+          HTA
           ls -la site-pronto
 
       - uses: actions/upload-artifact@v4
         with:
           name: site-pronto
-          path: site-pronto
+          path: ${{ env.APP_DIR }}/site-pronto
           include-hidden-files: true
